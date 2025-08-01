@@ -11,3 +11,8 @@ wheels/
 
 # Result
 bilibili_downloads/
+
+# Login
+bilibili_cookies.json
+bilibili_cookies.txt
+bilibili_qrcode.png
