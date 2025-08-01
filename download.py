@@ -3,16 +3,51 @@ import os
 from tqdm import tqdm
 import requests
 from urllib.parse import urlparse, unquote
-    
+from http.cookiejar import LWPCookieJar
+
 HEADER = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36"
 }
 DOWNLOAD_INFO_RAW_URL = "https://api.bilibili.com/x/player/playurl?"
 VIDEO_DATA_INTERFACE = "https://api.bilibili.com/x/web-interface/view?"
 
+COOKIES_DIR = "cookies"
+COOKIE_FILE = os.path.join(COOKIES_DIR, "bilibili_cookies.txt")
+JSON_COOKIE_FILE = os.path.join(COOKIES_DIR, "bilibili_cookies.json")
+
 class BiliVideoDownloader:
     def __init__(self):
-        pass
+        self.session = requests.Session()
+        self.cookie_jar = LWPCookieJar(COOKIE_FILE)
+        self._load_cookies()
+        
+    def _load_cookies(self):
+        os.makedirs(COOKIES_DIR, exist_ok=True)
+        if os.path.exists(COOKIE_FILE):
+            try:
+                self.cookie_jar.load(ignore_discard=True, ignore_expires=True)
+                for cookie in self.cookie_jar:
+                    self.session.cookies.set_cookie(cookie)
+                print("检测到已保存的Cookie文件，已加载登录状态")
+            except Exception as e:
+                print(f"加载Cookie文件出错: {e}")
+                
+    def is_logged_in(self) -> bool:
+        try:
+            response = self.session.get(
+                "https://api.bilibili.com/x/web-interface/nav",
+                headers=HEADER,
+                timeout=10
+            )
+            data = response.json()
+            if data.get("code") == 0 and data.get("data", {}).get("isLogin"):
+                print(f"登录状态有效! 用户名: {data['data']['uname']}")
+                return True
+            print("登录状态无效，将以游客身份下载(可能无法下载高画质视频)")
+            return False
+        except Exception as e:
+            print(f"检查登录状态失败: {e}")
+            return False
         
     def _bv_parser(self, text: str) -> str:
         bv_pattern = re.compile(r'^BV[0-9A-Za-z]+$')
@@ -30,23 +65,30 @@ class BiliVideoDownloader:
         
     def _video_data_get(self, bv: str) -> dict:
         json_response: dict = {}
-        interface_url:str = f"{VIDEO_DATA_INTERFACE}{bv}"
-        raw_response = requests.get(interface_url, headers=HEADER)
-        if raw_response.status_code == 200:
+        interface_url: str = f"https://api.bilibili.com/x/web-interface/view?{bv}"
+        try:
+            raw_response = self.session.get(interface_url, headers=HEADER)
+            raw_response.raise_for_status()
             json_response = raw_response.json()
-        else:
-            print(f"请求失败，状态码为{raw_response.status_code}")
+        except Exception as e:
+            print(f"请求视频信息失败: {e}")
+            return {}
+        
         data: dict = json_response.get("data", {})
+        if not data:
+            print("获取视频数据失败")
+            return {}
+            
         up: dict = data.get("owner", {})
         pages: list = data.get("pages", [])
         page_list: list = []
         
         for page in pages:
             page_list.append({
-                            "page_number": page.get("page", 0), 
-                            "cid": page.get("cid", ""),
-                            "page_title": page.get("part", ""),
-                            })
+                "page_number": page.get("page", 0), 
+                "cid": page.get("cid", ""),
+                "page_title": page.get("part", ""),
+            })
             
         result: dict = {
             "bvid": data.get("bvid", ""),
@@ -54,10 +96,10 @@ class BiliVideoDownloader:
             "title": data.get("title", ""),
             "pages_number": data.get("videos", 0),
             "up": up.get("name", ""),
-            "up_url": f"https://space.bilibili.com/{up.get("mid", "")}",
+            "up_url": f"https://space.bilibili.com/{up.get('mid', '')}",
             "pages": page_list
         }
-
+        
         return result
             
     def print_video_data(self, video_data: dict):
@@ -105,7 +147,7 @@ class BiliVideoDownloader:
                 }
                 
                 print(f"\n获取分P{page_number}支持的画质...")
-                resp = requests.get(
+                resp = self.session.get(
                     f"https://api.bilibili.com/x/player/playurl?{bv}&cid={cid}",
                     headers=headers
                 )
@@ -127,7 +169,7 @@ class BiliVideoDownloader:
                 quality, fmt = self._choose_format(format_list)
 
                 print(f"获取分P{page_number}的下载链接...")
-                resp = requests.get(
+                resp = self.session.get(
                     f"https://api.bilibili.com/x/player/playurl?{bv}&cid={cid}&qn={quality}",
                     headers=headers
                 )
@@ -189,15 +231,13 @@ class BiliVideoDownloader:
         
         for info in download_info_list:
             try:
-                # 创建安全的文件名
                 safe_title = re.sub(r'[\\/:*?"<>|]', "", info['page_title'])
                 filename = f"{video_data['title']}_{safe_title}.{info['format']}" if video_data['pages_number'] > 1 else f"{video_data['title']}.{info['format']}"
                 filepath = os.path.join(download_dir, unquote(filename))
                 
                 print(f"\n开始下载分P{info['page_index']+1} [{info['quality']} {info['format']}]: {filename}")
                 
-                # 下载文件
-                with requests.get(info['url'], headers=info['header'], stream=True) as response:
+                with self.session.get(info['url'], headers=info['header'], stream=True) as response:
                     response.raise_for_status()
                     total_size = int(response.headers.get('content-length', 0))
                     
@@ -215,6 +255,7 @@ class BiliVideoDownloader:
                 print(f"下载分P{info['page_index'] + 1}失败: {str(e)}")
                 
     def download(self):
+        self.is_logged_in()
         while True:
             text: str = input("输入视频BV/URL(输入q退出):\n").strip()
             if text.lower() == 'q':
