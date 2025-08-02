@@ -169,7 +169,7 @@ class BiliCommentsFetcher:
         return datetime.datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
     
     def _sanitize_filename(self, filename: str) -> str:
-        return re.sub(r'[\\/:*?"<>|]', '', filename)
+        return re.sub(r'[\\/:*?"<>|]', "", filename)
     
     def _parse_page_range(self, input_str: str, total_pages: int) -> list[int]:
         pages: list[int] = []

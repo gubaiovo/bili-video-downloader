@@ -225,13 +225,15 @@ class BiliVideoDownloader:
             print("没有可下载的视频！")
             return
         
-        download_dir = "bilibili_downloads"
-        video_path = os.path.join(download_dir, video_data['title'], "video")
-        os.makedirs(video_path, exist_ok=True)
+
         
         for info in download_info_list:
             try:
                 safe_title = re.sub(r'[\\/:*?"<>|]', "", info['page_title'])
+                download_dir = "bilibili_downloads"
+                video_path = os.path.join(download_dir, re.sub(r'[\\/:*?"<>|]', "", video_data['title']), "video")
+                os.makedirs(video_path, exist_ok=True)
+                
                 filename = f"{video_data['title']}_{safe_title}.{info['format']}" if video_data['pages_number'] > 1 else f"{video_data['title']}.{info['format']}"
                 filepath = os.path.join(video_path, unquote(filename))
                 
