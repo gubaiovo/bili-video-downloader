@@ -167,7 +167,7 @@ class BiliVideoDownloader:
                     
                 print(f"\n为分P{page_number}选择画质:")
                 quality, fmt = self._choose_format(format_list)
-
+                # print(f"LOG: quality={quality}, fmt={fmt}")
                 print(f"获取分P{page_number}的下载链接...")
                 resp = self.session.get(
                     f"https://api.bilibili.com/x/player/playurl?{bv}&cid={cid}&qn={quality}",
@@ -204,7 +204,7 @@ class BiliVideoDownloader:
         
         print("请选择视频质量:")
         for idx, fmt in enumerate(format_list):
-            print(f"{idx+1}. {fmt['new_description']} (qn={fmt['quality']}, 格式: {fmt['format']})")
+            print(f"{idx+1}. {fmt['new_description']} (qn={fmt['quality']}, 格式: {fmt['format'][0:3]})")
         
         while True:
             try:
@@ -215,7 +215,7 @@ class BiliVideoDownloader:
                 choice_idx = int(choice) - 1
                 if 0 <= choice_idx < len(format_list):
                     selected = format_list[choice_idx]
-                    return (str(selected['quality']), selected['format'])
+                    return (str(selected['quality']), selected['format'][0:3])
                 else:
                     print("输入无效，请输入有效的数字或q退出")
             except ValueError:
