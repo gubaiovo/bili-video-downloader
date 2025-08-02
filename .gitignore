@@ -16,3 +16,11 @@ bilibili_downloads/
 bilibili_cookies.json
 bilibili_cookies.txt
 bilibili_qrcode.png
+
+# test
+test.py
+test.txt
+request_test.py
+
+# Comments
+comments/

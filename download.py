@@ -5,7 +5,7 @@ import requests
 from urllib.parse import urlparse, unquote
 from http.cookiejar import LWPCookieJar
 
-HEADER = {
+HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.4280.88 Safari/537.36"
 }
 DOWNLOAD_INFO_RAW_URL = "https://api.bilibili.com/x/player/playurl?"
@@ -13,7 +13,6 @@ VIDEO_DATA_INTERFACE = "https://api.bilibili.com/x/web-interface/view?"
 
 COOKIES_DIR = "cookies"
 COOKIE_FILE = os.path.join(COOKIES_DIR, "bilibili_cookies.txt")
-JSON_COOKIE_FILE = os.path.join(COOKIES_DIR, "bilibili_cookies.json")
 
 class BiliVideoDownloader:
     def __init__(self):
@@ -36,7 +35,7 @@ class BiliVideoDownloader:
         try:
             response = self.session.get(
                 "https://api.bilibili.com/x/web-interface/nav",
-                headers=HEADER,
+                headers=HEADERS,
                 timeout=10
             )
             data = response.json()
@@ -67,7 +66,7 @@ class BiliVideoDownloader:
         json_response: dict = {}
         interface_url: str = f"https://api.bilibili.com/x/web-interface/view?{bv}"
         try:
-            raw_response = self.session.get(interface_url, headers=HEADER)
+            raw_response = self.session.get(interface_url, headers=HEADERS)
             raw_response.raise_for_status()
             json_response = raw_response.json()
         except Exception as e:
@@ -227,13 +226,14 @@ class BiliVideoDownloader:
             return
         
         download_dir = "bilibili_downloads"
-        os.makedirs(download_dir, exist_ok=True)
+        video_path = os.path.join(download_dir, video_data['title'], "video")
+        os.makedirs(video_path, exist_ok=True)
         
         for info in download_info_list:
             try:
                 safe_title = re.sub(r'[\\/:*?"<>|]', "", info['page_title'])
                 filename = f"{video_data['title']}_{safe_title}.{info['format']}" if video_data['pages_number'] > 1 else f"{video_data['title']}.{info['format']}"
-                filepath = os.path.join(download_dir, unquote(filename))
+                filepath = os.path.join(video_path, unquote(filename))
                 
                 print(f"\n开始下载分P{info['page_index']+1} [{info['quality']} {info['format']}]: {filename}")
                 
@@ -254,7 +254,7 @@ class BiliVideoDownloader:
             except Exception as e:
                 print(f"下载分P{info['page_index'] + 1}失败: {str(e)}")
                 
-    def download(self):
+    def run(self):
         self.is_logged_in()
         while True:
             text: str = input("输入视频BV/URL(输入q退出):\n").strip()
@@ -289,7 +289,7 @@ class BiliVideoDownloader:
 def main():
     downloader = BiliVideoDownloader()
     while True:
-        downloader.download()
+        downloader.run()
 
             
 if __name__ == '__main__':
