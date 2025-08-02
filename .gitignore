@@ -13,14 +13,11 @@ wheels/
 bilibili_downloads/
 
 # Login
-bilibili_cookies.json
-bilibili_cookies.txt
+cookies/
 bilibili_qrcode.png
 
 # test
-test.py
-test.txt
-request_test.py
+test/
 
 # Comments
 comments/
